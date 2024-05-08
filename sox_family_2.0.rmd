@@ -1,0 +1,2146 @@
+---
+title: "familia_sox"
+author: "Matias Guerra"
+date: "05-10-2021"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+false= FALSE
+true= TRUE
+```
+
+## R project
+
+### Instalando paquetes
+
+Instalando los paquetes que necesitaremos para poder llevar a cabo el analisis
+
+```{r}
+install.packages('R.utils')
+```
+
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("SPIA")
+```
+
+```{r}
+install.packages('R.utils')
+R.utils::setOption( "clusterProfiler.download.method",'auto' )
+```
+
+
+```{r, eval=false}
+install.packages(c("BiocManager","dplyr","gplots","ggplot2","ggrepel"))
+
+```
+
+```{r,eval=false}
+BiocManager::install(c("limma","DESeq2","AnnotationDbi","org.Hs.eg.db","ReportingTools","GO.db","GOstats","pathview","gage","gageData","hexbin"))
+```
+
+```{r}
+install.packages(c("matrixStats", "Hmisc", "splines", "foreach", "doParallel", "fastcluster", "dynamicTreeCut", "survival", "BiocManager"))
+BiocManager::install(c("GO.db", "preprocessCore", "impute","clusterProfiler"))
+```
+```{r}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("vsn")
+```
+
+
+```{r}
+install.packages("BiocManager")
+BiocManager::install("WGCNA")
+```
+
+
+
+
+## Llamando las librerias
+```{r,message=false}
+library(DESeq2)
+library(DOSE)
+library(UpSetR)
+library(dplyr)
+library(ggplot2)
+library(gplots)
+library(ggrepel)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(limma)
+library(GO.db)
+library(GOstats)
+library(pathview)
+library(gage)
+library(gageData)
+library(selectr)
+library(hexbin)
+library(kableExtra)
+library(tidyverse)
+library(RColorBrewer)
+library(pheatmap)
+library(SummarizedExperiment)
+library(pvclust)
+library(stats)
+library(eulerr)
+library(UpSetR)
+library(viridis)
+library(vsn)
+```
+## Importando la tabla de Counts
+```{r}
+
+countData <- read.table("fc0.counts.txt", header = 1,row.names = "geneid")
+coldata <- read.csv("metadata.txt", row.names=1)
+coldata <- coldata[,c("Condicion","Sexo")]
+coldata$Condicion <- factor(coldata$Condicion)
+coldata$Sexo <- factor(coldata$Sexo)
+```
+
+```{r}
+head(countData,2)
+```
+
+```{r}
+coldata
+```
+
+```{r}
+rownames(coldata) <- sub("", "", rownames(coldata))
+all(rownames(coldata) %in% colnames(countData))
+```
+
+```{r}
+all(rownames(coldata) == colnames(countData))
+```
+
+```{r}
+summary(countData)#resumen
+colSums(countData)#tamaño de las librerias segun muestras
+```
+
+```{r}
+par(mar=c(8,4,4,1)+0.1)
+barplot(colSums(countData)/1e6,col="green",las=3,main="Número total de lecturas (millones)", ylab="Número total de lecturas en millones")
+```
+
+
+
+```{r}
+logCountData = log2(1+countData)
+par(mfrow = c(1, 2), mar=c(8,4,4,1))  # two columns
+hist(logCountData[,1], main="Histogram of Log Read Counts", xlab="Log transformed counts")
+boxplot(logCountData,las=3, main="Boxplot of Log Read Counts")
+
+```
+
+```{r}
+x <- logCountData
+myColors = rainbow(dim(x)[2])
+plot(density(x[,1]),col = myColors[1], lwd=2,
+     xlab="Expression values", ylab="Density", main= "Distribution of transformed data",
+     ylim=c(0, max(density(x[,1])$y)+.02 ) )
+  
+for( i in 2:dim(x)[2] )
+lines(density(x[,i]),col=myColors[i], lwd=2)
+legend("topright", cex=1.1,colnames(x), lty=rep(1,dim(x)[2]), col=myColors )	
+```
+
+```{r}
+detectGroups <- function (x){  # x are col names
+  tem <- gsub("[0-9]*$","",x) # Remove all numbers from end
+  #tem = gsub("_Rep|_rep|_REP","",tem)
+  tem <- gsub("_$","",tem); # remove "_" from end
+  tem <- gsub("_Rep$","",tem); # remove "_Rep" from end
+  tem <- gsub("_rep$","",tem); # remove "_rep" from end
+  tem <- gsub("_REP$","",tem)  # remove "_REP" from end
+  return( tem )
+}
+
+groups = as.character ( detectGroups( colnames( countData ) ) )
+groups
+```
+
+```{r}
+plot(logCountData[,1],logCountData[,3])
+```
+
+```{r}
+plot(logCountData[,1],logCountData[,7])
+```
+
+```{r}
+plot(logCountData[,1],logCountData[,11])
+```
+
+
+```{r}
+##Run the following code to plot the mean versus variance for the 'Mov10 overexpression' replicates:
+mean_counts <- apply(countData[, 1:12], 1, mean)
+variance_counts <- apply(countData[, 1:12], 1, var)
+df <- data.frame(mean_counts, variance_counts)
+
+ggplot(df) +
+  geom_point(aes(x=mean_counts, y=variance_counts)) + 
+  geom_line(aes(x=mean_counts, y=mean_counts, color="red")) +
+  scale_y_log10() +
+  scale_x_log10()
+```
+
+```{r}
+
+as.data.frame(coldata)
+```
+
+```{r}
+model.matrix(~1+ Sexo + Condicion + Sexo:Condicion + Sexo*Condicion, coldata)
+```
+
+```{r}
+### Check that sample names match in both files
+all(colnames(countData) %in% rownames(coldata))
+all(colnames(countData) == rownames(coldata))
+```
+##Creando el objeto DESeq2
+```{r}
+## Creamos el objeto DESeq2Dataset
+
+dds <- DESeqDataSetFromMatrix(countData = countData, 
+                              colData = coldata,
+                              design = ~1 + Sexo + Condicion + Sexo:Condicion)
+dds$Condicion <- relevel(dds$Condicion,ref = "NFD")
+dds$Sexo <- relevel(dds$Sexo,ref = "FEMALE")
+dds <- dds[,order(dds$Sexo,dds$Condicion)]
+```
+
+```{r}
+View(counts(dds))
+
+dds <- estimateSizeFactors(dds)
+sizeFactors(dds)
+
+normalized_counts <- counts(dds, normalized=TRUE)
+
+write.table(normalized_counts, file="normalized_counts.txt", sep="\t", quote=F, col.names=NA)
+
+```
+##Trasnformacion de los datos
+```{r}
+### Transformar las cuentas para la visualizacion de los datos
+rld <- rlog(dds, blind=TRUE)
+vsd <- vst(dds, blind = TRUE)
+slog <- log2(counts(dds, normalized=TRUE)+1)
+```
+
+```{r}
+par(mfrow = c(1, 3))  # 3 columnas
+plot(slog[,1],slog[,2])
+plot(assay(rld)[,1],assay(rld)[,2])
+plot(assay(vsd)[,1],assay(vsd)[,2])
+```
+
+```{r}
+par(mfrow = c(1, 3))  # 3 columnas
+slog <- log2(counts(dds, normalized=TRUE)+1)
+plot(slog[,1],slog[,2])
+slog <- log2(counts(dds, normalized=TRUE)+4)
+plot(slog[,1],slog[,2], xlim=c(0,20))
+slog <- log2(counts(dds, normalized=TRUE)+20)
+plot(slog[,1],slog[,2], xlim=c(0,20))
+```
+
+```{r}
+df <- bind_rows(
+  as_data_frame(slog[,1:2]) %>%
+         mutate(transformation = "log2(x + 1)"),
+  as_data_frame(assay(rld)[, 1:2]) %>% mutate(transformation = "rlog"),
+  as_data_frame(assay(vsd)[, 1:2]) %>% mutate(transformation = "vst"))
+```
+
+```{r}
+colnames(df)[1:2] <- c("x", "y")  
+
+ggplot(df, aes(x = x, y = y)) + geom_hex(bins = 80) +
+  coord_fixed() + facet_grid( . ~ transformation)
+```
+
+```{r}
+df1 <- bind_rows(
+  as_data_frame(slog[,3:4]) %>%
+         mutate(transformation = "log2(x + 1)"),
+  as_data_frame(assay(rld)[, 3:4]) %>% mutate(transformation = "rlog"),
+  as_data_frame(assay(vsd)[, 3:4]) %>% mutate(transformation = "vst"))
+```
+
+```{r}
+colnames(df1)[1:2] <- c("x", "y")  
+
+ggplot(df1, aes(x = x, y = y)) + geom_hex(bins = 80) +
+  coord_fixed() + facet_grid( . ~ transformation)
+```
+
+
+## Analisis de calidad: Graficos de PCA
+```{r}
+### Graficar PCA 
+plotPCA(rld, intgroup= "Condicion")
+
+```
+
+```{r}
+plotPCA(rld, intgroup= "Sexo")
+```
+
+
+```{r}
+pdf(file = "grafico_PCA.pdf",
+    width = 10,
+    height = 8)
+
+pca.object <- prcomp(t(assay(rld))) # PCA 
+pcaData = as.data.frame(pca.object$x[,1:2]); 
+pcaData = cbind(pcaData,detectGroups(colnames(assay(rld)) ))
+colnames(pcaData) = c("PC1", "PC2", "Type")
+percentVar=round(100*summary(pca.object)$importance[2,1:2],0)
+#graficar
+p=ggplot(pcaData, aes(PC1, PC2, color=Type, shape = Type)) + geom_point(size=5) 
+p=p+xlab(paste0("PC1: ",percentVar[1],"% variance")) 
+p=p+ylab(paste0("PC2: ",percentVar[2],"% variance")) 
+p=p+ggtitle("Principal component analysis (PCA)")+coord_fixed(ratio=1.0)+ 
+    theme(plot.title = element_text(size = 16,hjust = 0.5)) + theme(aspect.ratio=1) +
+    theme(axis.text.x = element_text( size = 16),
+    axis.text.y = element_text( size = 16),
+    axis.title.x = element_text( size = 16),
+    axis.title.y = element_text( size = 16) ) +
+  theme(legend.text=element_text(size=16))
+print(p)
+dev.off()
+```
+
+
+
+
+```{r}
+dist2 <- function(x, ...)   # funcion de distancia = 1-PCC (coeficiente de correlacion de Pearson)
+  as.dist(1-cor(t(x), method="pearson"))
+
+fit = cmdscale( dist2(t(assay(rld))) , eig=T, k=2)
+mdsData <- as.data.frame(fit$points[,1:2]); 
+mdsData <- cbind(mdsData,detectGroups(colnames(assay(rld))) )
+colnames(mdsData) = c("x1", "x2", "Type")
+	
+p<-ggplot(mdsData, aes(x1, x2, color=Type, shape = Type)) + geom_point(size=5) 
+p=p+xlab("Dimension 1") 
+p=p+ylab("Dimension 2") 
+p=p+ggtitle("Multidimensional scaling (MDS)")+ coord_fixed(ratio=1.)+ 
+     theme(plot.title = element_text(hjust = 0.5)) + theme(aspect.ratio=1) +
+	 	 theme(axis.text.x = element_text( size = 16),
+        axis.text.y = element_text( size = 16),
+        axis.title.x = element_text( size = 16),
+        axis.title.y = element_text( size = 16) ) +
+	   theme(legend.text=element_text(size=16))
+print(p)
+```
+
+```{r}
+###La entrada es una matriz de valores transformados logarítmicos
+rld <- rlog(dds, blind=T)
+rld_mat <- assay(rld)
+pca <- prcomp(t(rld_mat))
+```
+
+```{r}
+# Creamos un marco de datos con metadatos y valores PC3 y PC4 para ingresar a ggplot
+df <- cbind(coldata, pca$x)
+ggplot(df) + geom_point(aes(x=PC1, y=PC4, color = Sexo))
+```
+
+```{r}
+df <- cbind(coldata, pca$x)
+ggplot(df) + geom_point(aes(x=PC3, y=PC4, color = Sexo))
+```
+
+
+## Mapa de calor de agrupamiento jerarquico
+```{r,fig.height=8, fig.width=12}
+library(gplots)
+
+hclust2 <- function(x, method="average", ...)  # enlace promedio en agrupamiento jerárquico
+  hclust(x, method=method, ...)
+
+n=50 # número de genes principales por desviación estándar
+
+x = assay(rld)
+if(n>dim(x)[1]) n = dim(x)[1] # máximo como datos
+
+x = x[order(apply(x,1,sd),decreasing=TRUE),]  # ordenar genes por desviación estándar
+
+x = x[1:n,]   # mantener solo los genes n
+
+# esto cortará valores muy grandes, lo que podría sesgar el color
+x=as.matrix(x[1:n,])-apply(x[1:n,],1,mean)
+cutoff = median(unlist(x)) + 4*sd (unlist(x)) 
+x[x>cutoff] <- cutoff
+cutoff = median(unlist(x)) - 4*sd (unlist(x)) 
+x[x< cutoff] <- cutoff
+	
+groups = detectGroups(colnames(x) )
+groups.colors = rainbow(length(unique(groups) ) )
+
+
+	lmat = rbind(c(5,4),c(0,1),c(3,2))
+	lwid = c(1.5,4)
+	lhei = c(1,.2,4)
+
+
+heatmap.2(x, distfun = dist2,hclustfun=hclust2,
+	 col=greenred(75), density.info="none", trace="none", scale="none", keysize=.5
+	,key=T, symkey=F
+	,ColSideColors=groups.colors[ as.factor(groups)]
+	,margins=c(8,12)
+	,cexRow=1
+	,srtCol=45
+	,cexCol=1.  # tamaño de fuente para nombres de muestra
+	,lmat = lmat, lwid = lwid, lhei = lhei
+	)
+```
+
+```{r}
+### Extraiga la matriz rlog del objeto
+rld_mat <- assay(rld)    ## assay() es una funcion del paquete "SummarizedExperiment" que se cargó cuando cargó DESeq2
+
+### Calcular valores de correlación por pares
+rld_cor <- cor(rld_mat)    ## cor() es una función base de R
+
+head(rld_cor)   ## comprobar la salida de cor(), tome nota de los nombres de fila y columnas
+
+```
+
+## Analisis de expresion diferencial
+```{r}
+## Correr el analisis
+dds <- DESeq(dds)
+
+## Establecer umbral
+dds = dds[rowSums(counts(dds)) > 50,] 
+
+## Compruebe los factores de tamaño
+dds.norm <- estimateSizeFactors(dds)
+sizeFactors(dds.norm)
+
+## Número total de recuentos sin procesar por muestra
+colSums(counts(dds))
+
+## Número total de recuentos normalizados por muestra
+colSums(counts(dds, normalized=T))
+
+## Graficar las estimaciones de dispersión
+plotDispEsts(dds)
+
+
+```
+### Normalizacion de los datos
+```{r}
+pdf(file = "Normalized_counts.pdf",
+    width = 5,
+    height = 5)
+
+par(mfrow = c(1, 1),mar=c(8,4,4,1)+0.1)
+boxplot(log2(counts(dds.norm, normalized=TRUE)), cex.axis=0.7, 
+        las=3, ylab="log2(normalized counts)", horizontal=false, main="Normalized Counts") 
+dev.off()
+```
+
+
+```{r}
+## nombre de los resultados
+
+resultsNames(dds)
+```
+
+```{r}
+# obtener la matriz del modelo
+mod_mat <- model.matrix(design(dds), colData(dds))
+
+# Definir vectores de coeficientes para cada condición
+MUJER_SANA <- colMeans(mod_mat[dds$Sexo == "FEMALE" & dds$Condicion == "NFD", ])
+HOMBRE_SANO <- colMeans(mod_mat[dds$Sexo == "MALE" & dds$Condicion == "NFD", ])
+MUJER_DCM <- colMeans(mod_mat[dds$Sexo == "FEMALE" & dds$Condicion == "DCM", ])
+HOMBRE_DCM <- colMeans(mod_mat[dds$Sexo == "MALE" & dds$Condicion == "DCM", ])
+```
+
+### Dendrograma 
+```{r}
+
+bootstrap <- 10000
+pv <- pvclust(rld_mat, method.dist = "euclidean", 
+                  method.hclust="average", nboot=bootstrap)
+```
+
+
+
+
+
+```{r}
+plot(pv)
+pvrect(pv,alpha= 0.95)
+```
+
+```{r}
+seplot(pv, identify=TRUE)
+```
+
+
+###Construyendo la tabla de resultados
+```{r}
+## Defina contrastes, extraiga la tabla de resultados y reduzca los cambios de pliegue log2
+
+res1_unshrunken <- results(dds, contrast = HOMBRE_SANO - MUJER_SANA, alpha = 0.05)
+
+res1 <- lfcShrink(dds, contrast = HOMBRE_SANO - MUJER_SANA, res=res1_unshrunken, type="ashr")
+
+res2_unshrunken <- results(dds, contrast = HOMBRE_DCM - MUJER_DCM, alpha = 0.05)
+
+res2<- lfcShrink(dds,contrast = HOMBRE_DCM - MUJER_DCM, res=res2_unshrunken, type="ashr")
+
+res3_unshrunken <- results(dds, contrast = MUJER_DCM - MUJER_SANA, alpha = 0.05)
+
+res3 <- lfcShrink(dds, contrast = MUJER_DCM - MUJER_SANA, res=res3_unshrunken, type="ashr")
+
+res4_unshrunken <- results(dds, contrast = HOMBRE_DCM - HOMBRE_SANO, alpha = 0.05)
+
+res4 <- lfcShrink(dds, contrast = HOMBRE_DCM - HOMBRE_SANO, res=res4_unshrunken, type="ashr")
+
+```
+
+### Graficos MA
+```{r}
+## Comencemos con los resultados no reducidos:
+DESeq2::plotMA(res1_unshrunken, ylim=c(-10,10))
+```
+
+```{r}
+##Y ahora los resultados reducidos:
+DESeq2::plotMA(res1, ylim=c(-10,10))
+```
+
+```{r}
+DESeq2::plotMA(res2_unshrunken, ylim=c(-10,10))
+```
+
+```{r}
+DESeq2::plotMA(res2, ylim=c(-10,10))
+```
+
+```{r}
+DESeq2::plotMA(res3_unshrunken, ylim=c(-10,10))
+```
+
+```{r}
+DESeq2::plotMA(res3, ylim=c(-10,10))
+```
+
+```{r}
+DESeq2::plotMA(res4_unshrunken, ylim=c(-10,10))
+```
+
+```{r}
+DESeq2::plotMA(res4, ylim=c(-10,10))
+```
+
+
+### Resumen de los resultados hasta ahora
+```{r}
+summary(res1)
+```
+
+```{r}
+summary(res2)
+```
+
+```{r}
+summary(res3)
+```
+
+```{r}
+summary(res4)
+```
+
+
+
+```{r}
+mcols(res1, use.names=T)
+mcols(res2, use.names=T)
+mcols(res3, use.names=T)
+mcols(res4, use.names=T)
+```
+```{r}
+res1 %>% data.frame() %>% View()
+res2 %>% data.frame() %>% View()
+res3 %>% data.frame() %>% View()
+res4 %>% data.frame() %>% View()
+```
+
+
+```{r}
+### Definimos los umbrales
+padj.cutoff <- 0.05
+lfc.cutoff <- 1.5
+```
+
+### Hombres sanos vs Mujeres sanas
+
+\#\#Podemos dividir fácilmente la tabla de resultados para incluir solo aquellos que son significativos usando la función filter(), pero primero convertiremos la tabla de resultados en un tibble:
+
+```{r}
+res1_tb <- res1 %>%
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+```
+
+\#\#Ahora podemos subdividir esa tabla para mantener solo los genes significativos usando nuestros umbrales predefinidos:
+
+```{r}
+sig1 <- res1_tb %>%
+  dplyr::filter(padj < padj.cutoff & abs(log2FoldChange) > lfc.cutoff)
+```
+
+\#\#¿Cuántos genes se expresan diferencialmente en los hombres sanos en comparación con las mujeres sanas, dados nuestros criterios especificados anteriormente? ¿Esto reduce nuestros resultados?
+
+```{r}
+sig1
+write.csv(sig1, file = "sig_HOMBRE_SANOvsMUJER_SANA.csv")
+```
+
+### Hombres enfermos vs Mujeres enfermas
+\#\#repetimos lo mismo con todas las comparaciones
+
+```{r}
+res2_tb <- res2 %>%
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+```
+
+```{r}
+sig2 <- res2_tb %>%
+  dplyr::filter(padj < padj.cutoff & abs(log2FoldChange) > lfc.cutoff)
+```
+
+```{r}
+sig2
+write.csv(sig2, file = "sig_DCMMALEvsDCMFEMALE.csv")
+```
+
+### Mujeres enfermas vs Mujeres sanas
+
+```{r}
+res3_tb<- res3 %>%
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+```
+
+```{r}
+sig3 <- res3_tb %>%
+  dplyr::filter(padj < padj.cutoff & abs(log2FoldChange) > lfc.cutoff)
+```
+
+```{r}
+sig3
+write.csv(sig3, file = "DCMFEMALEvsNFDFEMALE.csv")
+```
+
+###Hombres enfermos vs Hombres sanos
+
+```{r}
+res4_tb<- res4 %>%
+  data.frame() %>%
+  rownames_to_column(var="gene") %>% 
+  as_tibble()
+```
+
+```{r}
+sig4 <- res4_tb %>%
+  dplyr::filter(padj < padj.cutoff & abs(log2FoldChange) > lfc.cutoff)
+```
+
+```{r}
+sig4
+write.csv(sig4, file = "DCMMALEvsNFDMALE.csv")
+```
+
+
+
+
+
+
+### Nueva metadata para tidyverse
+\#\#Vamos a crear objetos tibble a partir de los marcos de datos meta y normalized_counts antes de comenzar a trazar. Esto nos permitirá usar la funcionalidad de tidyverse más fácilmente.
+
+```{r}
+# Crear tibbles incluyendo nombres de fila
+familia_sox_meta <- coldata %>% 
+  rownames_to_column(var="samplename") %>% 
+  as_tibble()
+
+normalized_counts <- normalized_counts %>% 
+  data.frame() %>%
+  rownames_to_column(var = "gene") %>%
+  as_tibble()
+```
+
+### Graficos de genes especificos, por condicion, sexo.
+\#\#Para seleccionar un gen específico de interés para graficar, podemos usar plotCounts() de DESeq2:
+
+```{r}
+# Trazar la expresión de un solo gen
+plotCounts(dds, gene="ENSG00000115286", intgroup="Condicion") #Esta función solo permite trazar los recuentos de un solo gen a la vez.
+```
+
+```{r}
+plotCounts(dds, gene="ENSG00000115286", intgroup="Sexo")
+```
+
+```{r}
+# Guardar el trazado de cuentas en un objeto de marco de datos
+NDUFS7 <- plotCounts(dds, gene="ENSG00000115286", intgroup=c("Condicion","Sexo"), returnData=TRUE)
+```
+
+```{r}
+# Trazar los recuentos normalizados de NDUFS7, utilizando los nombres de muestra (nombres de fila de NDUFS7 como etiquetas)
+ggplot(NDUFS7, aes(x =Sexo, y = count, color = Condicion)) + 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(NDUFS7))) + 
+  theme_bw() +
+  ggtitle("NDUFS7") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+#Repetimos los mismo para los demas genes de interes
+plotCounts(dds, gene="ENSG00000156885", intgroup="Condicion") 
+```
+
+```{r}
+plotCounts(dds, gene="ENSG00000156885", intgroup="Sexo")
+```
+
+```{r}
+COX6A2 <- plotCounts(dds, gene="ENSG00000156885", intgroup=c("Condicion","Sexo"), returnData=TRUE)
+```
+
+```{r}
+ggplot(COX6A2, aes(x = Sexo, y = count, color = Condicion)) + 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(COX6A2))) + 
+  theme_bw() +
+  ggtitle("COX6A2") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+plotCounts(dds, gene="ENSG00000099624", intgroup="Condicion")
+```
+
+```{r}
+plotCounts(dds, gene="ENSG00000099624", intgroup="Sexo")
+```
+
+```{r}
+ATP5D <- plotCounts(dds, gene="ENSG00000099624", intgroup=c("Condicion","Sexo"), returnData=TRUE)
+```
+
+```{r}
+ggplot(ATP5D, aes(x = Sexo, y = count, color = Condicion)) + 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(ATP5D))) + 
+  theme_bw() +
+  ggtitle("ATP5D") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+plotCounts(dds, gene="ENSG00000133110", intgroup="Condicion") 
+```
+
+```{r}
+plotCounts(dds, gene="ENSG00000133110", intgroup="Sexo")
+```
+
+```{r}
+POSTN <- plotCounts(dds, gene="ENSG00000133110", intgroup=c("Condicion","Sexo"), returnData=TRUE)
+```
+
+```{r}
+ggplot(POSTN, aes(x = Sexo, y = count, color = Condicion)) + 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(POSTN))) + 
+  theme_bw() +
+  ggtitle("POSTN") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+plotCounts(dds, gene="ENSG00000106819", intgroup="Condicion")
+```
+
+```{r}
+plotCounts(dds, gene="ENSG00000106819", intgroup="Sexo")
+```
+
+```{r}
+ASPN <- plotCounts(dds, gene="ENSG00000106819", intgroup=c("Condicion","Sexo"), returnData=TRUE)
+```
+
+```{r}
+ggplot(ASPN, aes(x = Sexo, y = count, color = Condicion)) + 
+  geom_point(position=position_jitter(w = 0.1,h = 0)) +
+  geom_text_repel(aes(label = rownames(ASPN))) + 
+  theme_bw() +
+  ggtitle("ASPN") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+
+
+```{r}
+columns(org.Hs.eg.db)
+
+```
+
+```{r}
+res1_tb$ensembl <- gsub("\\..*","", row.names(res1_tb))
+```
+
+```{r}
+res1_tb$SYMBOL = mapIds(org.Hs.eg.db,
+                    key=res1_tb$gene,
+                    column="SYMBOL",
+                    keytype = "ENSEMBL",
+                    multiVals = "first")
+res1_tb$ENTREZ = mapIds(org.Hs.eg.db,
+                    key=res1_tb$gene,
+                    column="ENTREZID",
+                    keytype = "ENSEMBL",
+                    multiVals = "first")
+head(res1_tb)
+```
+
+```{r}
+
+res1_tb$symbol <- mapIds(org.Hs.eg.db,
+                     keys= res1_tb$gene,
+                     column="SYMBOL",
+                     keytype="ENSEMBL", #Out ID is ENSMBL
+                     multiVals="first")
+```
+
+
+```{r}
+res2_tb$ensembl <- gsub("\\..*","", row.names(res2_tb))
+```
+
+```{r}
+res2_tb$SYMBOL = mapIds(org.Hs.eg.db,
+                    key=res2_tb$gene,
+                    column="SYMBOL",
+                    keytype = "ENSEMBL",
+                    multiVals = "first")
+res2_tb$ENTREZ = mapIds(org.Hs.eg.db,
+                    key=res2_tb$gene,
+                    column="ENTREZID",
+                    keytype = "ENSEMBL",
+                    multiVals = "first")
+head(res2_tb)
+```
+
+```{r}
+
+res2_tb$symbol <- mapIds(org.Hs.eg.db,
+                     keys= res2_tb$gene,
+                     column="SYMBOL",
+                     keytype="ENSEMBL", #Out ID is ENSMBL
+                     multiVals="first")
+```
+
+```{r}
+res3_tb$ensembl <- gsub("\\..*","", row.names(res3_tb))
+```
+
+```{r}
+res3_tb$SYMBOL = mapIds(org.Hs.eg.db,
+                    key=res3_tb$gene,
+                    column="SYMBOL",
+                    keytype = "ENSEMBL",
+                    multiVals = "first")
+res3_tb$ENTREZ = mapIds(org.Hs.eg.db,
+                    key=res3_tb$gene,
+                    column="ENTREZID",
+                    keytype = "ENSEMBL",
+                    multiVals = "first")
+head(res3_tb)
+```
+
+```{r}
+
+res3_tb$symbol <- mapIds(org.Hs.eg.db,
+                     keys= res3_tb$gene,
+                     column="SYMBOL",
+                     keytype="ENSEMBL", #Out ID is ENSMBL
+                     multiVals="first")
+```
+
+```{r}
+res4_tb$ensembl <- gsub("\\..*","", row.names(res4_tb))
+```
+
+```{r}
+res4_tb$SYMBOL = mapIds(org.Hs.eg.db,
+                    key=res4_tb$gene,
+                    column="SYMBOL",
+                    keytype = "ENSEMBL",
+                    multiVals = "first")
+res4_tb$ENTREZ = mapIds(org.Hs.eg.db,
+                    key=res4_tb$gene,
+                    column="ENTREZID",
+                    keytype = "ENSEMBL",
+                    multiVals = "first")
+head(res4_tb)
+```
+
+```{r}
+
+res4_tb$symbol <- mapIds(org.Hs.eg.db,
+                     keys= res4_tb$gene,
+                     column="SYMBOL",
+                     keytype="ENSEMBL", #Out ID is ENSMBL
+                     multiVals="first")
+```
+
+### Grafico de volcan  
+\#\#Para generar un diagrama de volcán, primero necesitamos tener una columna en nuestros datos de resultados que indique si el gen se considera expresado diferencialmente en función de los valores ajustados de p.
+
+```{r}
+## Obtain logical vector where TRUE values denote padj values < 0.05 and fold change > 1.5 in either direction
+
+res1_tb <- res1_tb %>% 
+  mutate(threshold = padj < 0.05 & abs(log2FoldChange) >= 1.5)
+
+```
+
+```{r}
+# The significantly differentially expressed genes are the ones found in the upper-left and upper-right corners.
+# Add a column to the data frame to specify if they are UP- or DOWN- regulated (log2FoldChange respectively positive or negative)
+
+# add a column of NAs
+res1_tb$diffexpressed <- "NO"
+# if log2Foldchange > 0.6 and pvalue < 0.05, set as "UP" 
+res1_tb$diffexpressed[res1_tb$log2FoldChange >= 1.5 & res1_tb$padj < 0.05] <- "UP"
+# if log2Foldchange < -0.6 and pvalue < 0.05, set as "DOWN"
+res1_tb$diffexpressed[res1_tb$log2FoldChange <= -1.5 & res1_tb$padj < 0.05] <- "DOWN"
+
+# Now write down the name of genes beside the points...
+# Create a new column "delabel" to res1_tableOE_tb, that will contain the name of genes differentially expressed (NA in case they are not)
+res1_tb$delabel <- NA
+res1_tb$delabel[res1_tb$diffexpressed != "NO"] <- res1_tb$symbol[res1_tb$diffexpressed != "NO"]
+```
+
+
+```{r}
+## Obtain logical vector where TRUE values denote padj values < 0.05 and fold change > 1.5 in either direction
+
+res2_tb <- res2_tb %>% 
+  mutate(threshold = padj < 0.05 & abs(log2FoldChange) >= 1.5)
+
+```
+
+```{r}
+# The significantly differentially expressed genes are the ones found in the upper-left and upper-right corners.
+# Add a column to the data frame to specify if they are UP- or DOWN- regulated (log2FoldChange respectively positive or negative)
+
+# add a column of NAs
+res2_tb$diffexpressed <- "NO"
+# if log2Foldchange > 0.6 and pvalue < 0.05, set as "UP" 
+res2_tb$diffexpressed[res2_tb$log2FoldChange >= 1.5 & res2_tb$padj < 0.05] <- "UP"
+# if log2Foldchange < -0.6 and pvalue < 0.05, set as "DOWN"
+res2_tb$diffexpressed[res2_tb$log2FoldChange <= -1.5 & res2_tb$padj < 0.05] <- "DOWN"
+
+# Now write down the name of genes beside the points...
+# Create a new column "delabel" to res1_entrez, that will contain the name of genes differentially expressed (NA in case they are not)
+res2_tb$delabel <- NA
+res2_tb$delabel[res2_tb$diffexpressed != "NO"] <- res2_tb$symbol[res2_tb$diffexpressed != "NO"]
+```
+
+```{r}
+## Obtain logical vector where TRUE values denote padj values < 0.05 and fold change > 1.5 in either direction
+
+res3_tb <- res3_tb %>% 
+  mutate(threshold = padj < 0.05 & abs(log2FoldChange) >= 1.5)
+
+```
+
+```{r}
+# The significantly differentially expressed genes are the ones found in the upper-left and upper-right corners.
+# Add a column to the data frame to specify if they are UP- or DOWN- regulated (log2FoldChange respectively positive or negative)
+
+# add a column of NAs
+res3_tb$diffexpressed <- "NO"
+# if log2Foldchange > 0.6 and pvalue < 0.05, set as "UP" 
+res3_tb$diffexpressed[res3_tb$log2FoldChange >= 1.5 & res3_tb$padj < 0.05] <- "UP"
+# if log2Foldchange < -0.6 and pvalue < 0.05, set as "DOWN"
+res3_tb$diffexpressed[res3_tb$log2FoldChange <= -1.5 & res3_tb$padj < 0.05] <- "DOWN"
+
+# Now write down the name of genes beside the points...
+# Create a new column "delabel" to res1_entrez, that will contain the name of genes differentially expressed (NA in case they are not)
+res3_tb$delabel <- NA
+res3_tb$delabel[res3_tb$diffexpressed != "NO"] <- res3_tb$symbol[res3_tb$diffexpressed != "NO"]
+```
+
+
+```{r}
+## Obtain logical vector where TRUE values denote padj values < 0.05 and fold change > 1.5 in either direction
+
+res4_tb <- res4_tb %>% 
+  mutate(threshold = padj < 0.05 & abs(log2FoldChange) >= 1.5)
+
+```
+
+```{r}
+# The significantly differentially expressed genes are the ones found in the upper-left and upper-right corners.
+# Add a column to the data frame to specify if they are UP- or DOWN- regulated (log2FoldChange respectively positive or negative)
+
+# add a column of NAs
+res4_tb$diffexpressed <- "NO"
+# if log2Foldchange > 0.6 and pvalue < 0.05, set as "UP" 
+res4_tb$diffexpressed[res4_tb$log2FoldChange >= 1.5 & res4_tb$padj < 0.05] <- "UP"
+# if log2Foldchange < -0.6 and pvalue < 0.05, set as "DOWN"
+res4_tb$diffexpressed[res4_tb$log2FoldChange <= -1.5 & res4_tb$padj < 0.05] <- "DOWN"
+
+# Now write down the name of genes beside the points...
+# Create a new column "delabel" to res1_entrez, that will contain the name of genes differentially expressed (NA in case they are not)
+res4_tb$delabel <- NA
+res4_tb$delabel[res4_tb$diffexpressed != "NO"] <- res4_tb$symbol[res4_tb$diffexpressed != "NO"]
+```
+
+
+
+\#\#Now we can start plotting. The geom_point object is most applicable, as this is essentially a scatter plot:
+
+```{r}
+## Volcano plot
+pdf(file = "volcano_plot_Differential expression between healthy men vs. healthy women.pdf",
+    width = 12,
+    height = 8)
+
+
+ggplot(res1_tb) +
+  geom_point(aes(x = log2FoldChange, y = -log10(padj), colour = diffexpressed,label=delabel)) +
+  ggtitle("Differential expression between healthy men vs. healthy women") +
+  xlab("log2 fold change") + 
+  ylab("-log10 adjusted p-value") +
+  scale_y_continuous(limits = c(0,20)) +
+  scale_x_continuous(limits = c(-11,11))+
+  scale_color_manual(values=c("blue", "black", "red")) +
+   geom_vline(xintercept=c(-1.5, 1.5), col="red") +
+        geom_hline(yintercept=-log10(0.05), col="red")
+  theme(legend.position = "right",
+        plot.title = element_text(size = rel(1.5), hjust = 0.5),
+        axis.title = element_text(size = rel(1.25)))
+  dev.off()
+  
+
+```
+
+```{r}
+## Volcano plot
+pdf(file = "volcano_plot_Differential expression between sick men vs sick women.pdf",
+    width = 6,
+    height = 6)
+
+ggplot(res2_tb) +
+  geom_point(aes(x = log2FoldChange, y = -log10(padj), colour = diffexpressed,label=delabel)) +
+  ggtitle("Differential expression between sick men vs sick women") +
+  xlab("log2 fold change") + 
+  ylab("-log10 adjusted p-value") +
+  scale_y_continuous(limits = c(0,20)) +
+  scale_x_continuous(limits = c(-11,11))+
+  scale_color_manual(values=c("blue", "black", "red")) +
+   geom_vline(xintercept=c(-1.5, 1.5), col="red") +
+        geom_hline(yintercept=-log10(0.05), col="red")
+  theme(legend.position = "right",
+        plot.title = element_text(size = rel(1.5), hjust = 0.5),
+        axis.title = element_text(size = rel(1.25)))  
+  dev.off()
+```
+
+```{r}
+## Volcano plot
+pdf(file = "volcano_plot_Differential expression between sick vs. healthy women.pdf",
+    width = 6,
+    height = 6)
+
+ggplot(res3_tb) +
+  geom_point(aes(x = log2FoldChange, y = -log10(padj), colour = diffexpressed,label=delabel)) +
+  ggtitle("Differential expression between sick vs. healthy women") +
+  xlab("log2 fold change") + 
+  ylab("-log10 adjusted p-value") +
+  scale_y_continuous(limits = c(0,20)) +
+  scale_x_continuous(limits = c(-11,11))+
+  scale_color_manual(values=c("blue", "black", "red")) +
+   geom_vline(xintercept=c(-1.5, 1.5), col="red") +
+        geom_hline(yintercept=-log10(0.05), col="red")
+  theme(legend.position = "right",
+        plot.title = element_text(size = rel(1.5), hjust = 0.5),
+        axis.title = element_text(size = rel(1.25)))
+  dev.off()
+```
+
+```{r}
+## Volcano plot
+pdf(file = "volcano_plot_Differential expression between sick vs healthy men.pdf",
+    width = 6,
+    height = 6)
+
+ggplot(res4_tb) +
+  geom_point(aes(x = log2FoldChange, y = -log10(padj), colour = diffexpressed,label=delabel)) +
+  ggtitle("Differential expression between sick vs. healthy men") +
+  xlab("log2 fold change") + 
+  ylab("-log10 adjusted p-value") +
+  scale_y_continuous(limits = c(0,20)) +
+  scale_x_continuous(limits = c(-11,11))+
+  scale_color_manual(values=c("blue", "black", "red")) +
+   geom_vline(xintercept=c(-1.5, 1.5), col="red") +
+        geom_hline(yintercept=-log10(0.05), col="red")
+  theme(legend.position = "right",
+        plot.title = element_text(size = rel(1.5), hjust = 0.5),
+        axis.title = element_text(size = rel(1.25)))
+  dev.off()
+```
+
+
+## Analisis de Ontologia de genes y generacion de vias KEGG
+
+```{r}
+library(org.Hs.eg.db)
+library(DOSE)
+library(pathview)
+library(clusterProfiler)
+library(AnnotationHub)
+library(ensembldb)
+library(tidyverse)
+library(dplyr)
+library(annotables)
+```
+### sanos contra sanas
+```{r}
+## Explore the grch38 table loaded by the annotables library
+grch38
+
+## Return the IDs for the gene symbols in the DE results
+idx_1 <- grch38$ensgene %in% rownames(res1)
+
+ids_1 <- grch38[idx_1, ]
+
+## The gene names can map to more than one Ensembl ID (some genes change ID over time), 
+## so we need to remove duplicate IDs prior to assessing enriched GO terms
+non_duplicates_1 <- which(duplicated(ids_1$ensgene) == FALSE)
+
+ids_1 <- ids_1[non_duplicates_1, ] 
+
+## Merge the IDs with the results 
+res_ids_1 <- inner_join(res1_tb, ids_1, by=c("gene"="ensgene"))  
+```
+
+```{r}
+## Create background dataset for hypergeometric testing using all genes tested for significance in the results                 
+all_genes1 <- as.character(res_ids_1$gene)
+
+## Extract significant results
+sig1_DE <- dplyr::filter(res_ids_1, padj < 0.05 & abs(log2FoldChange) >= 1.5)
+
+sig1_DE_genes <- as.character(sig1_DE$gene)
+
+```
+
+### Ontologia 1
+```{r}
+# Run GO enrichment analysis 
+ego_1 <- enrichGO(gene = sig1_DE_genes, 
+                universe = all_genes1,
+                keyType = "ENSEMBL",
+                OrgDb = org.Hs.eg.db, 
+                ont = "BP", 
+                pAdjustMethod = "BH", 
+                qvalueCutoff = 0.05, 
+                readable = TRUE,
+                minGSSize = 10)
+                
+## Output results from GO analysis to a table
+cluster_summary_1 <- data.frame(ego_1)
+
+write.csv(cluster_summary_1, "clusterProfiler_NFDMALEvsNFDFEMALE.csv")
+```
+### dot plot ontologia 1
+```{r}
+## Dotplot 
+dotplot(ego_1 ,showCategory =10)
+```
+
+
+
+```{r}
+## Remove any NA values
+res1_entrez <- dplyr::filter(res_ids_1, entrez != "NA")
+
+## Remove any Entrez duplicates
+res1_entrez <- res1_entrez[which(duplicated(res1_entrez$entrez) == F), ]
+```
+
+```{r}
+## Extract the foldchanges
+foldchanges_1 <- res1_entrez$log2FoldChange
+
+## Name each fold change with the corresponding Entrez ID
+names(foldchanges_1) <- res1_entrez$entrez
+```
+
+```{r}
+## Sort fold changes in decreasing order
+foldchanges_1 <- sort(foldchanges_1, decreasing = TRUE)
+
+head(foldchanges_1)
+```
+
+```{r}
+R.utils::setOption( "clusterProfiler.download.method",'auto' )
+```
+### kegg 1
+```{r}
+## GSEA using gene sets from KEGG pathways
+gseaKEGG_1 <- gseKEGG(geneList = foldchanges_1, # ordered named vector of fold changes (Entrez IDs are the associated names)
+              organism = "hsa", # supported organisms listed below
+              keyType = "kegg",
+              minGSSize = 20, # minimum gene set size (# genes in set) - change to test more sets or recover sets with fewer # genes
+              pvalueCutoff = 0.05, # padj cutoff value
+              pAdjustMethod = "BH",
+              verbose = FALSE)
+
+## Extract the GSEA results
+gseaKEGG_1_results <- gseaKEGG_1@result
+```
+
+```{r}
+## Write GSEA results to file
+View(gseaKEGG_1_results)
+
+write.csv(gseaKEGG_1_results, "gseaOE1_kegg.csv", quote=F)
+```
+
+```{r}
+## Plot the GSEA plot for a single enriched pathway, `hsa00190`
+gseaplot(gseaKEGG_1, geneSetID = 'hsa00190')
+```
+
+```{r}
+## Output images for a single significant KEGG pathway
+detach('package:dplyr', unload=TRUE) # first unload dplyr to avoid conflicts
+pathview(gene.data = foldchanges_1,
+              pathway.id = "hsa00190",
+              species = "hsa",
+              limit = list(gene = 1.5, # value gives the max/min limit for foldchanges
+              cpd = 1))
+```
+
+```{r}
+## Output images for all significant KEGG pathways
+get_kegg_1_plots <- function(x) {
+   pathview(gene.data = foldchanges_1, pathway.id = gseaKEGG_1_results$ID[x], species = "hsa", 
+       limit = list(gene = 1.5, cpd = 1))
+}
+
+purrr::map(1:length(gseaKEGG_1_results$ID), get_kegg_1_plots)
+```
+###GSEA GO 1
+```{r}
+# GSEA using gene sets associated with BP Gene Ontology terms
+gseaGO_1 <- gseGO(geneList = foldchanges_1, 
+              OrgDb = org.Hs.eg.db,
+              keyType = "ENTREZID",
+              ont = 'BP',
+              pvalueCutoff = 0.05,
+              verbose = TRUE) 
+
+gseaGO_1_results <- gseaGO_1@result
+
+gseaplot(gseaGO_1, geneSetID = 'GO:0006119')
+```
+
+```{r}
+dotplot(
+  gseaGO_1,
+  x= ,
+  showCategory=1,
+  color = "p.adjust",
+  size = NULL,
+  split = ".sign",
+  font.size = 19,
+  title = "GO Biological Process",
+  orderBy = "x",
+  label_format = 30)+
+  scale_color_viridis(option = "C") + facet_grid(.~.sign)
+```
+
+### gprofiler 1
+```{r}
+
+install.packages("gprofiler2")
+install.packages("treemap")
+
+library(gprofiler2)
+library(treemap)
+
+## Running gprofiler to identify enriched processes among significant genes
+
+gprofiler_results_1 <- gprofiler2::gost(query = sig1_DE_genes, 
+                                  organism = "hsapiens",
+                                  ordered_query = F, 
+                                  exclude_iea = F, 
+                                  user_threshold  = 0.05, 
+                                  correction_method = "fdr",
+                                  domain_scope = "annotated",
+                                  custom_bg = all_genes1)
+```
+```{r}
+names(gprofiler_results_1)
+
+```
+
+
+```{r}
+head(gprofiler_results_1$result, 3)
+```
+
+
+```{r}
+names(gprofiler_results_1$meta)
+```
+
+
+
+```{r}
+gostplot(gprofiler_results_1, capped = TRUE, interactive = TRUE)
+```
+
+```{r}
+p1 <- gostplot(gprofiler_results_1, capped = FALSE, interactive = FALSE)
+p1
+```
+
+
+```{r}
+pp1 <- publish_gostplot(p1, highlight_terms = c("GO:0060912","HP:0001450"), 
+                       width = NA, height = NA, filename = NULL )
+```
+
+
+```{r}
+publish_gosttable(gprofiler_results_1, highlight_terms = gprofiler_results_1$result[c(1:2,10,120),],
+                        use_colors = TRUE, 
+                        show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                        filename = NULL)
+#> The input 'highlight_terms' is a data.frame. The column 'term_id' will be used.
+```
+
+
+
+### enfermos contra enfermas
+```{r}
+
+library(dplyr)
+
+grch38
+
+## Return the IDs for the gene symbols in the DE results
+idx_2 <- grch38$ensgene %in% rownames(res2)
+
+ids_2 <- grch38[idx_2, ]
+
+## The gene names can map to more than one Ensembl ID (some genes change ID over time), 
+## so we need to remove duplicate IDs prior to assessing enriched GO terms
+non_duplicates_2 <- which(duplicated(ids_2$ensgene) == FALSE)
+
+ids_2 <- ids_2[non_duplicates_2, ] 
+
+## Merge the IDs with the results 
+res_ids_2 <- inner_join(res2_tb, ids_2, by=c("gene"="ensgene"))  
+```
+
+```{r}
+## Create background dataset for hypergeometric testing using all genes tested for significance in the results                 
+all_genes2 <- as.character(res_ids_2$gene)
+
+## Extract significant results
+sig2_DE <- dplyr::filter(res_ids_2, padj < 0.05, abs(log2FoldChange) >= 1.5)
+
+sig2_DE_genes <- as.character(sig2_DE$gene)
+```
+### ontologia 2
+```{r}
+# Run GO enrichment analysis 
+ego_2 <- enrichGO(gene = sig2_DE_genes, 
+                universe = all_genes2,
+                keyType = "ENSEMBL",
+                OrgDb = org.Hs.eg.db, 
+                ont = "BP", 
+                pAdjustMethod = "BH", 
+                qvalueCutoff = 0.05, 
+                readable = TRUE)
+                
+## Output results from GO analysis to a table
+cluster_summary_2 <- data.frame(ego_2)
+
+write.csv(cluster_summary_2, "clusterProfiler_DCMMALEvsDCMFEMALE.csv")
+```
+### dot plot ontologia 2
+```{r}
+## Dotplot 
+dotplot(ego_2, showCategory=20)
+```
+
+
+
+```{r}
+## Remove any NA values
+res2_entrez <- dplyr::filter(res_ids_2, entrez != "NA")
+
+## Remove any Entrez duplicates
+res2_entrez <- res2_entrez[which(duplicated(res2_entrez$entrez) == F), ]
+```
+
+```{r}
+## Extract the foldchanges
+foldchanges_2 <- res2_entrez$log2FoldChange
+
+## Name each fold change with the corresponding Entrez ID
+names(foldchanges_2) <- res2_entrez$entrez
+```
+
+
+
+```{r}
+## Sort fold changes in decreasing order
+foldchanges_2 <- sort(foldchanges_2, decreasing = TRUE)
+
+head(foldchanges_2)
+```
+### kegg 2
+```{r}
+## GSEA using gene sets from KEGG pathways
+gseaKEGG_2 <- gseKEGG(geneList = foldchanges_2, # ordered named vector of fold changes (Entrez IDs are the associated names)
+              organism = "hsa", # supported organisms listed below
+              keyType = "kegg",
+              minGSSize = 20, # minimum gene set size (# genes in set) - change to test more sets or recover sets with fewer # genes
+              pvalueCutoff = 0.05, # padj cutoff value
+              verbose = FALSE)
+
+## Extract the GSEA results
+gseaKEGG_2_results <- gseaKEGG_2@result
+```
+
+```{r}
+## Write GSEA results to file
+View(gseaKEGG_2_results)
+
+write.csv(gseaKEGG_2_results, "gseaOE2_kegg.csv", quote=F)
+```
+### dot plot kegg 2
+```{r}
+dotplot(
+  gseaKEGG_2,
+  x= ,
+  showCategory=4,
+  color = "p.adjust",
+  size = NULL,
+  split = ".sign",
+  font.size = 22,
+  title = "KEGG",
+  orderBy = "x",
+  label_format = 30)+
+  scale_color_viridis() + facet_grid(.~.sign)
+```
+
+
+```{r}
+## Plot the GSEA plot for a single enriched pathway, `hsa00190`
+gseaplot(gseaKEGG_2, geneSetID = 'hsa00190')
+```
+
+```{r}
+## Output images for a single significant KEGG pathway
+detach("package:dplyr", unload=TRUE) # first unload dplyr to avoid conflicts
+pathview(gene.data = foldchanges_2,
+              pathway.id = "hsa00190",
+              species = "hsa",
+              limit = list(gene = 1.5, # value gives the max/min limit for foldchanges
+              cpd = 1))
+```
+
+```{r}
+## Output images for all significant KEGG pathways
+get_kegg_2_plots <- function(x) {
+   pathview(gene.data = foldchanges_2, pathway.id = gseaKEGG_2_results$ID[x], species = "hsa", 
+       limit = list(gene = 1.5, cpd = 1))
+}
+
+purrr::map(1:length(gseaKEGG_2_results$ID), get_kegg_2_plots)
+```
+### GSEA GO 2
+```{r}
+# GSEA using gene sets associated with BP Gene Ontology terms
+gseaGO_2 <- gseGO(geneList = foldchanges_2, 
+              OrgDb = org.Hs.eg.db, 
+              ont = 'BP',
+              minGSSize = 20, 
+              pvalueCutoff = 0.05,
+              verbose = FALSE) 
+
+gseaGO_2_results <- gseaGO_2@result
+
+gseaplot(gseaGO_2, geneSetID = 'GO:0006119')
+
+```
+
+```{r}
+dotplot(
+  gseaGO_2,
+  x= ,
+  showCategory=5,
+  color = "p.adjust",
+  size = NULL,
+  split = ".sign",
+  font.size = 22,
+  title = "GO Biological Process",
+  orderBy = "x",
+  label_format = 30)+
+  scale_color_viridis(option = "C") + facet_grid(.~.sign)
+```
+
+
+```{r}
+library(GSEABase)
+c2 <- read.gmt("c2.cp.v7.5.1.entrez.txt")
+
+msig_2 <- GSEA(foldchanges_2, TERM2GENE=c2, verbose=FALSE)
+
+msig_df_2 <- data.frame(msig_2)
+```
+
+
+### gprogiler 2
+
+```{r}
+
+## Running gprofiler to identify enriched processes among significant genes
+
+gprofiler_results_2 <- gprofiler2::gost(query = sig2_DE_genes, 
+                                  organism = "hsapiens",
+                                  ordered_query = F, 
+                                  exclude_iea = F, 
+                                  user_threshold  = 0.05, 
+                                  correction_method = "fdr",
+                                  domain_scope = "annotated",
+                                  custom_bg = all_genes2)
+```
+```{r}
+names(gprofiler_results_2)
+
+```
+
+
+```{r}
+head(gprofiler_results_2$result, 3)
+```
+
+
+```{r}
+names(gprofiler_results_2$meta)
+```
+
+
+
+```{r}
+gostplot(gprofiler_results_2, capped = TRUE, interactive = TRUE)
+```
+
+```{r}
+p2 <- gostplot(gprofiler_results_2, capped = FALSE, interactive = FALSE)
+p2
+```
+
+
+```{r}
+pp2 <- publish_gostplot(p2, highlight_terms = c("GO:0060912","HP:0001450"), 
+                       width = NA, height = NA, filename = NULL )
+```
+
+
+```{r}
+publish_gosttable(gprofiler_results_2, highlight_terms = gprofiler_results_2$result[c(1:2,10,120),],
+                        use_colors = TRUE, 
+                        show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                        filename = NULL)
+#> The input 'highlight_terms' is a data.frame. The column 'term_id' will be used.
+```
+### Diagrama de venn 1
+```{r}
+## Venn-diagram using the `VennDiagram` library (see below for alternative method)
+library(VennDiagram)
+# Arguments for a pairwise (two-sets) venn-diagram are sizes for set1, set2 and overlap (intersect)
+# Many more functions are available for triple, quad and quantuple diagrams (starting with 'draw.***')
+venn.plot <- draw.pairwise.venn(length(sig1_DE_genes),
+                                length(sig2_DE_genes),
+                                # Calculate the intersection of the two sets
+                                length(intersect(sig1_DE_genes, sig2_DE_genes) ),
+                                category = c("NFD Male vs Female", "DCM Male vs Female"), scaled = F,
+                                fill = c("yellow", "purple"), alpha = rep(0.5, 2),
+                                 cat.cex = 1.5,
+                                cex = 2,
+                                cat.pos = c(0, 0))
+
+# Actually plot the plot
+grid.draw(venn.plot)
+```
+
+
+
+
+
+### enfermas vs sanas
+```{r}
+
+library(dplyr)
+
+grch38
+
+## Return the IDs for the gene symbols in the DE results
+idx_3 <- grch38$ensgene %in% rownames(res3)
+
+ids_3 <- grch38[idx_3, ]
+
+## The gene names can map to more than one Ensembl ID (some genes change ID over time), 
+## so we need to remove duplicate IDs prior to assessing enriched GO terms
+non_duplicates_3 <- which(duplicated(ids_3$ensgene) == FALSE)
+
+ids_3 <- ids_3[non_duplicates_3, ] 
+
+## Merge the IDs with the results 
+res_ids_3 <- inner_join(res3_tb, ids_3, by=c("gene"="ensgene"))  
+```
+
+```{r}
+## Create background dataset for hypergeometric testing using all genes tested for significance in the results                 
+all_genes3 <- as.character(res_ids_3$gene)
+
+## Extract significant results
+sig3_DE <- dplyr::filter(res_ids_3, padj < 0.05, abs(log2FoldChange) >= 1.5)
+
+sig3_DE_genes <- as.character(sig3_DE$gene)
+```
+### ontologia 3
+```{r}
+# Run GO enrichment analysis 
+ego_3 <- enrichGO(gene = sig3_DE_genes, 
+                universe = all_genes3,
+                keyType = "ENSEMBL",
+                OrgDb = org.Hs.eg.db, 
+                ont = "BP", 
+                pAdjustMethod = "BH", 
+                qvalueCutoff = 0.05, 
+                readable = TRUE)
+                
+## Output results from GO analysis to a table
+cluster_summary_3 <- data.frame(ego_3)
+
+write.csv(cluster_summary_3, "clusterProfiler_DCMFEMALEvsNFDFEMALE.csv")
+```
+### dot plot ontologia 3
+```{r}
+## Dotplot 
+dotplot(ego_3, showCategory=10)
+```
+
+
+
+```{r}
+## Remove any NA values
+res3_entrez <- dplyr::filter(res_ids_3, entrez != "NA")
+
+## Remove any Entrez duplicates
+res3_entrez <- res3_entrez[which(duplicated(res3_entrez$entrez) == F), ]
+```
+
+```{r}
+## Extract the foldchanges
+foldchanges_3 <- res3_entrez$log2FoldChange
+
+## Name each fold change with the corresponding Entrez ID
+names(foldchanges_3) <- res3_entrez$entrez
+```
+
+```{r}
+## Sort fold changes in decreasing order
+foldchanges_3 <- sort(foldchanges_3, decreasing = TRUE)
+
+head(foldchanges_3)
+```
+### kegg 3
+```{r}
+## GSEA using gene sets from KEGG pathways
+gseaKEGG_3 <- gseKEGG(geneList = foldchanges_3, # ordered named vector of fold changes (Entrez IDs are the associated names)
+              organism = "hsa", # supported organisms listed below
+              minGSSize = 20, # minimum gene set size (# genes in set) - change to test more sets or recover sets with fewer # genes
+              pvalueCutoff = 0.05, # padj cutoff value
+              verbose = FALSE)
+
+## Extract the GSEA results
+gseaKEGG_3_results <- gseaKEGG_3@result
+```
+
+```{r}
+## Write GSEA results to file
+View(gseaKEGG_3_results)
+
+write.csv(gseaKEGG_3_results, "gseaOE3_kegg.csv", quote=F)
+```
+### dot plot kegg 3
+```{r}
+pdf(file = "dotplot_kegg_mujeres.pdf",
+    width = 8,
+    height = 5)
+
+dotplot(
+  gseaKEGG_3,
+  x= ,
+  showCategory=5,
+  color = "p.adjust",
+  size = NULL,
+  split = ".sign",
+  font.size = 22,
+  title = "KEGG",
+  orderBy = "x",
+  label_format = 30)+
+  scale_color_viridis() + facet_grid(.~.sign)
+dev.off()
+```
+
+
+
+```{r}
+barplot(gseaKEGG_3, showCategory=10)
+```
+
+
+```{r}
+## Plot the GSEA plot for a single enriched pathway, `hsa00190`
+gseaplot(gseaKEGG_3, geneSetID = 'hsa00190')
+```
+
+```{r}
+## Output images for a single significant KEGG pathway
+detach("package:dplyr", unload=TRUE) # first unload dplyr to avoid conflicts
+pathview(gene.data = foldchanges_3,
+              pathway.id = "hsa00190",
+              species = "hsa",
+              limit = list(gene = 2, # value gives the max/min limit for foldchanges
+              cpd = 1))
+```
+
+```{r}
+## Output images for all significant KEGG pathways
+get_kegg_3_plots <- function(x) {
+   pathview(gene.data = foldchanges_3, pathway.id = gseaKEGG_3_results$ID[x], species = "hsa", 
+       limit = list(gene = 2, cpd = 1))
+}
+
+purrr::map(1:length(gseaKEGG_3_results$ID), get_kegg_3_plots)
+```
+###GSEA GO 3
+```{r}
+# GSEA using gene sets associated with BP Gene Ontology terms
+gseaGO_3 <- gseGO(geneList = foldchanges_3, 
+              OrgDb = org.Hs.eg.db, 
+              ont = 'BP',
+              minGSSize = 20, 
+              pvalueCutoff = 0.05,
+              verbose = FALSE) 
+
+gseaGO_3_results <- gseaGO_3@result
+
+gseaplot(gseaGO_3, geneSetID = 'GO:0006119')
+```
+
+```{r}
+dotplot(
+  gseaGO_3,
+  x= ,
+  showCategory=5,
+  color = "p.adjust",
+  size = NULL,
+  split = ".sign",
+  font.size = 22,
+  title = "GO Biological Process",
+  orderBy = "x",
+  label_format = 30)+
+  scale_color_viridis(option = "C") + facet_grid(.~.sign)
+```
+
+
+```{r}
+library(GSEABase)
+c3 <- read.gmt("c2.cp.v7.5.1.entrez.txt")
+
+msig_3 <- GSEA(foldchanges_3, TERM2GENE=c3, verbose=FALSE)
+
+msig_df_3 <- data.frame(msig_3)
+```
+
+
+
+
+### gprofiler 3
+```{r}
+
+
+## Running gprofiler to identify enriched processes among significant genes
+
+gprofiler_results_3 <- gprofiler2::gost(query = sig3_DE_genes, 
+                                  organism = "hsapiens",
+                                  ordered_query = F, 
+                                  exclude_iea = F, 
+                                  user_threshold  = 0.05, 
+                                  correction_method = "fdr",
+                                  domain_scope = "annotated",
+                                  custom_bg = all_genes3)
+```
+
+```{r}
+names(gprofiler_results_3)
+
+```
+
+
+```{r}
+head(gprofiler_results_3$result, 3)
+```
+
+
+```{r}
+names(gprofiler_results_3$meta)
+```
+
+
+
+```{r}
+gostplot(gprofiler_results_3, capped = TRUE, interactive = TRUE)
+```
+
+```{r}
+p3 <- gostplot(gprofiler_results_3, capped = FALSE, interactive = FALSE)
+p3
+```
+
+
+```{r}
+pp3 <- publish_gostplot(p3, highlight_terms = c("GO:0060912","HP:0001450"), 
+                       width = NA, height = NA, filename = NULL )
+```
+
+
+```{r}
+publish_gosttable(gprofiler_results_3, highlight_terms = gprofiler_results_3$result[c(1:2,10,120),],
+                        use_colors = TRUE, 
+                        show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                        filename = NULL)
+#> The input 'highlight_terms' is a data.frame. The column 'term_id' will be used.
+```
+
+### enfermos vs sanos
+```{r}
+
+library(dplyr)
+
+## Return the IDs for the gene symbols in the DE results
+idx_4 <- grch38$ensgene %in% rownames(res4)
+
+ids_4 <- grch38[idx_4, ]
+
+## The gene names can map to more than one Ensembl ID (some genes change ID over time), 
+## so we need to remove duplicate IDs prior to assessing enriched GO terms
+non_duplicates_4 <- which(duplicated(ids_4$ensgene) == FALSE)
+
+ids_4 <- ids_4[non_duplicates_4, ] 
+
+## Merge the IDs with the results 
+res_ids_4 <- inner_join(res4_tb, ids_4, by=c("gene"="ensgene"))  
+```
+
+```{r}
+## Create background dataset for hypergeometric testing using all genes tested for significance in the results                 
+all_genes4 <- as.character(res_ids_4$gene)
+
+## Extract significant results
+sig4_DE <- dplyr::filter(res_ids_4, padj < 0.05, abs(log2FoldChange) >= 1.5)
+
+sig4_DE_genes <- as.character(sig4_DE$gene)
+```
+### ontologia 4
+```{r}
+# Run GO enrichment analysis 
+ego_4 <- enrichGO(gene = sig4_DE_genes, 
+                universe = all_genes4,
+                keyType = "ENSEMBL",
+                OrgDb = org.Hs.eg.db, 
+                ont = "BP", 
+                pAdjustMethod = "BH", 
+                qvalueCutoff = 0.05, 
+                readable = TRUE)
+                
+## Output results from GO analysis to a table
+cluster_summary_4 <- data.frame(ego_4)
+
+write.csv(cluster_summary_4, "clusterProfiler_DCMMALEvsNFDMALE.csv")
+```
+### dotplot ontologia
+```{r}
+## Dotplot 
+dotplot(ego_4, showCategory=10)
+```
+
+
+
+```{r}
+## Remove any NA values
+res4_entrez <- dplyr::filter(res_ids_4, entrez != "NA")
+
+## Remove any Entrez duplicates
+res4_entrez <- res4_entrez[which(duplicated(res4_entrez$entrez) == F), ]
+```
+
+```{r}
+## Extract the foldchanges
+foldchanges_4 <- res4_entrez$log2FoldChange
+
+## Name each fold change with the corresponding Entrez ID
+names(foldchanges_4) <- res4_entrez$entrez
+```
+
+```{r}
+## Sort fold changes in decreasing order
+foldchanges_4 <- sort(foldchanges_4, decreasing = TRUE)
+
+head(foldchanges_4)
+```
+### kegg 4
+```{r}
+## GSEA using gene sets from KEGG pathways
+gseaKEGG_4 <- gseKEGG(geneList = foldchanges_4,
+              organism = "hsa",
+              minGSSize = 20,
+              pvalueCutoff = 0.05,
+              verbose = FALSE)
+
+## Extract the GSEA results
+gseaKEGG_4_results <- gseaKEGG_4@result
+```
+
+```{r}
+## Write GSEA results to file
+View(gseaKEGG_4_results)
+
+write.csv(gseaKEGG_4_results, "gseaOE4_kegg.csv", quote=F)
+```
+### dot plot kegg 4
+```{r}
+pdf(file = "dotplot_kegg_hombres.pdf",
+    width = 8,
+    height = 5)
+
+dotplot(
+  gseaKEGG_4,
+  x= ,
+  showCategory=5,
+  color = "p.adjust",
+  size = NULL,
+  split = ".sign",
+  font.size = 21,
+  title = "KEGG",
+  orderBy = "x",
+  label_format = 30)+scale_color_viridis(option = "C") + facet_grid(.~.sign)
+dev.off()
+```
+
+
+```{r}
+## Plot the GSEA plot for a single enriched pathway, `hsa00190`
+gseaplot(gseaKEGG_4, geneSetID = 'hsa04658')
+```
+
+```{r}
+## Output images for a single significant KEGG pathway
+detach("package:dplyr", unload=TRUE) # first unload dplyr to avoid conflicts
+pathview(gene.data = foldchanges_4,
+              pathway.id = "hsa04658",
+              species = "hsa",
+              limit = list(gene = 1.5, # value gives the max/min limit for foldchanges
+              cpd = 1))
+```
+
+```{r}
+## Output images for all significant KEGG pathways
+get_kegg_4_plots <- function(x) {
+   pathview(gene.data = foldchanges_4, pathway.id = gseaKEGG_4_results$ID[x], species = "hsa", 
+       limit = list(gene = 1.5, cpd = 1))
+}
+
+purrr::map(1:length(gseaKEGG_4_results$ID), get_kegg_4_plots)
+```
+### GSEA GO 4
+```{r}
+# GSEA using gene sets associated with BP Gene Ontology terms
+gseaGO_4 <- gseGO(geneList = foldchanges_4, 
+              OrgDb = org.Hs.eg.db, 
+              ont = 'BP',
+              minGSSize = 20, 
+              pvalueCutoff = 0.05,
+              verbose = FALSE) 
+
+gseaGO_4_results <- gseaGO_4@result
+
+gseaplot(gseaGO_4, geneSetID = 'GO:0006119')
+```
+
+```{r}
+dotplot(
+  gseaGO_4,
+  x= ,
+  showCategory=5,
+  color = "p.adjust",
+  size = NULL,
+  split = ".sign",
+  font.size = 22,
+  title = "GO Biological Process",
+  orderBy = "x",
+  label_format = 30)+
+  scale_color_viridis(option = "C") + facet_grid(.~.sign)
+```
+
+
+```{r}
+library(GSEABase)
+c4 <- read.gmt("c2.cp.v7.5.1.entrez.txt")
+
+msig_4 <- GSEA(foldchanges_4, TERM2GENE=c4, verbose=FALSE)
+
+msig_df_4 <- data.frame(msig_4)
+```
+
+
+
+
+### gprofiler 4
+```{r}
+
+## Running gprofiler to identify enriched processes among significant genes
+
+gprofiler_results_4 <- gprofiler2::gost(query = sig4_DE_genes, 
+                                  organism = "hsapiens",
+                                  ordered_query = F, 
+                                  exclude_iea = F, 
+                                  user_threshold  = 0.05, 
+                                  correction_method = "fdr",
+                                  domain_scope = "annotated",
+                                  custom_bg = all_genes4)
+```
+```{r}
+names(gprofiler_results_4)
+
+```
+
+
+```{r}
+head(gprofiler_results_4$result, 3)
+```
+
+
+```{r}
+names(gprofiler_results_4$meta)
+```
+
+
+
+```{r}
+gostplot(gprofiler_results_4, capped = TRUE, interactive = TRUE)
+```
+
+```{r}
+p4 <- gostplot(gprofiler_results_4, capped = FALSE, interactive = FALSE)
+p4
+```
+
+
+```{r}
+pp4 <- publish_gostplot(p4, highlight_terms = c("GO:0060912","HP:0001450"), 
+                       width = NA, height = NA, filename = NULL )
+```
+
+
+```{r}
+publish_gosttable(gprofiler_results_4, highlight_terms = gprofiler_results_4$result[c(1:2,10,120),],
+                        use_colors = TRUE, 
+                        show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                        filename = NULL)
+#> The input 'highlight_terms' is a data.frame. The column 'term_id' will be used.
+```
+### diagrama de venn 2
+```{r}
+# Arguments for a pairwise (two-sets) venn-diagram are sizes for set1, set2 and overlap (intersect)
+# Many more functions are available for triple, quad and quantuple diagrams (starting with 'draw.***')
+pdf(file = "diagrama_de_venn_2.pdf",
+    width = 8,
+    height = 5)
+
+venn.plot2 <- draw.pairwise.venn(length(sig3_DE_genes),
+                                length(sig4_DE_genes),
+                                # Calculate the intersection of the two sets
+                                length(intersect(sig3_DE_genes, sig4_DE_genes) ),
+                                category = c("Sick vs Healthy Women", "Sick vs Healthy Men"), scaled = F,
+                                fill = c("orange", "blue"), alpha = rep(0.5, 2),
+                                cat.cex = 1.5,
+                                cex = 2,
+                                cat.pos = c(0, 0))
+dev.off()
+
+# Actually plot the plot
+grid.draw(venn.plot2)
+```
+
+
+```{r}
+v1 <- list("NFD Hombre vs NFD Mujer"=sig1_DE_genes,"CMD Hombre vs CMD  Mujer"=sig2_DE_genes, "CMD Mujer vs NFD Mujer"=sig3_DE_genes, "CMD Hombre vs NFD Hombre"=sig4_DE_genes)
+upset(fromList(v1), order.by = "freq",sets.x.label = "GDE Totales", mainbar.y.label = "Numero de GDE compartidos" )
+```
+
