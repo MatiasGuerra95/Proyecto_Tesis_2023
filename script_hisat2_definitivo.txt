@@ -1,0 +1,182 @@
+## Pre-procesamiento de los datos de RNA-Seq (RNA-Seq data preprocessing)
+#Descargamos las secuencias crudas desde SRA usando la herramienta fastq-dump (We download the raw sequences from SRA using the fastq-dump tool)
+fastq-dump -I --split-files --gzip SRR10676949 & .
+fastq-dump -I --split-files --gzip SRR10676834 & .
+fastq-dump -I --split-files --gzip SRR10676836 & .
+fastq-dump -I --split-files --gzip SRR10676839 & .
+fastq-dump -I --split-files --gzip SRR10676964 & .
+fastq-dump -I --split-files --gzip SRR10676973 & .
+fastq-dump -I --split-files --gzip SRR10677007 & .
+fastq-dump -I --split-files --gzip SRR10677016 & .
+fastq-dump -I --split-files --gzip SRR10677019 & .
+fastq-dump -I --split-files --gzip SRR10677032 & .
+fastq-dump -I --split-files --gzip SRR10677040 & .
+fastq-dump -I --split-files --gzip SRR10677085 & .
+fastq-dump -I --split-files --gzip SRR10676852 & .
+fastq-dump -I --split-files --gzip SRR10676853 & . 
+fastq-dump -I --split-files --gzip SRR10676855 & .
+fastq-dump -I --split-files --gzip SRR10676864 & .
+fastq-dump -I --split-files --gzip SRR10676878 & .
+fastq-dump -I --split-files --gzip SRR10676884 & .
+fastq-dump -I --split-files --gzip SRR10676890 & .
+fastq-dump -I --split-files --gzip SRR10676891 & .
+fastq-dump -I --split-files --gzip SRR10676892 & . 
+fastq-dump -I --split-files --gzip SRR10676894 & .
+fastq-dump -I --split-files --gzip SRR10676897 & 
+fastq-dump -I --split-files --gzip SRR10676912 & .
+fastq-dump -I --split-files --gzip SRR10676914 & .
+fastq-dump -I --split-files --gzip SRR10677001 & .
+fastq-dump -I --split-files --gzip SRR10677027 & .
+fastq-dump -I --split-files --gzip SRR10677096 & .
+fastq-dump -I --split-files --gzip SRR10677120 & .
+fastq-dump -I --split-files --gzip SRR10676895 & .
+fastq-dump -I --split-files --gzip SRR10676904 & .
+fastq-dump -I --split-files --gzip SRR10676917 & .
+fastq-dump -I --split-files --gzip SRR10677041 & .
+fastq-dump -I --split-files --gzip SRR10677051 & .
+fastq-dump -I --split-files --gzip SRR10677089 & .
+fastq-dump -I --split-files --gzip SRR10677162 & .
+fastq-dump -I --split-files --gzip SRR10676825 & .
+fastq-dump -I --split-files --gzip SRR10677009 & .
+fastq-dump -I --split-files --gzip SRR10676923 & .
+fastq-dump -I --split-files --gzip SRR10676939 & .
+fastq-dump -I --split-files --gzip SRR10677088 & .
+fastq-dump -I --split-files --gzip SRR10677182 & .
+fastq-dump -I --split-files --gzip SRR10677181 & .
+
+
+#Verificamos la calidad de las secuencias (We verify the quality of the sequences)
+
+mkdir rawFastQC
+fastqc -t 20 rawReads/*.fastq.gz -o rawFastQC/
+
+
+#Luego de verificadas las secuencias, procedemos a hacer el "Trimming" de los datos, para deshacernos de los adaptadores (After verifying the sequences, we proceed to trim the data, to get rid of the adapters)
+
+conda install -c bioconda fastp
+
+fastp -i SRR10676949_1.fastq.gz -o 10676949_1.fastq.gz -O 10676949_2.fastq.gz -I SRR10676949_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676834_1.fastq.gz -o 10676834_1.fastq.gz -O 10676834_2.fastq.gz -I SRR10676834_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676836_1.fastq.gz -o 10676836_1.fastq.gz -O 10676836_2.fastq.gz -I SRR10676836_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676839_1.fastq.gz -o 10676839_1.fastq.gz -O 10676839_2.fastq.gz -I SRR10676839_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676964_1.fastq.gz -o 10676964_1.fastq.gz -O 10676964_2.fastq.gz -I SRR10676964_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676973_1.fastq.gz -o 10676973_1.fastq.gz -O 10676973_2.fastq.gz -I SRR10676973_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677007_1.fastq.gz -o 10677007_1.fastq.gz -O 10677007_2.fastq.gz -I SRR10677007_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677016_1.fastq.gz -o 10677016_1.fastq.gz -O 10677016_2.fastq.gz -I SRR10677016_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677019_1.fastq.gz -o 10677019_1.fastq.gz -O 10677019_2.fastq.gz -I SRR10677019_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677032_1.fastq.gz -o 10677032_1.fastq.gz -O 10677032_2.fastq.gz -I SRR10677032_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677040_1.fastq.gz -o 10677040_1.fastq.gz -O 10677040_2.fastq.gz -I SRR10677040_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677085_1.fastq.gz -o 10677085_1.fastq.gz -O 10677085_2.fastq.gz -I SRR10677085_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676852_1.fastq.gz -o 10676852_1.fastq.gz -O 10676852_2.fastq.gz -I SRR10676852_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676853_1.fastq.gz -o 10676853_1.fastq.gz -O 10676853_2.fastq.gz -I SRR10676853_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676855_1.fastq.gz -o 10676855_1.fastq.gz -O 10676855_2.fastq.gz -I SRR10676855_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676864_1.fastq.gz -o 10676864_1.fastq.gz -O 10676864_2.fastq.gz -I SRR10676864_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676878_1.fastq.gz -o 10676878_1.fastq.gz -O 10676878_2.fastq.gz -I SRR10676878_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676884_1.fastq.gz -o 10676884_1.fastq.gz -O 10676884_2.fastq.gz -I SRR10676884_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676890_1.fastq.gz -o 10676890_1.fastq.gz -O 10676890_2.fastq.gz -I SRR10676890_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676891_1.fastq.gz -o 10676891_1.fastq.gz -O 10676891_2.fastq.gz -I SRR10676891_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676892_1.fastq.gz -o 10676892_1.fastq.gz -O 10676892_2.fastq.gz -I SRR10676892_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676894_1.fastq.gz -o 10676894_1.fastq.gz -O 10676894_2.fastq.gz -I SRR10676894_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676897_1.fastq.gz -o 10676897_1.fastq.gz -O 10676897_2.fastq.gz -I SRR10676897_2.fastq.gz --dedud --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676912_1.fastq.gz -o 10676912_1.fastq.gz -O 10676912_2.fastq.gz -I SRR10676912_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 & 
+fastp -i SRR10676914_1.fastq.gz -o 10676914_1.fastq.gz -O 10676914_2.fastq.gz -I SRR10676914_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677001_1.fastq.gz -o 10677001_1.fastq.gz -O 10677001_2.fastq.gz -I SRR10677001_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677027_1.fastq.gz -o 10677027_1.fastq.gz -O 10677027_2.fastq.gz -I SRR10677027_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677096_1.fastq.gz -o 10677096_1.fastq.gz -O 10677096_2.fastq.gz -I SRR10677096_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677120_1.fastq.gz -o 10677120_1.fastq.gz -O 10677120_2.fastq.gz -I SRR10677120_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676895_1.fastq.gz -o 10676895_1.fastq.gz -O 10676895_2.fastq.gz -I SRR10676895_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676904_1.fastq.gz -o 10676904_1.fastq.gz -O 10676904_2.fastq.gz -I SRR10676904_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676917_1.fastq.gz -o 10676917_1.fastq.gz -O 10676917_2.fastq.gz -I SRR10676917_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 & 
+fastp -i SRR10677041_1.fastq.gz -o 10677041_1.fastq.gz -O 10677041_2.fastq.gz -I SRR10677041_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677051_1.fastq.gz -o 10677051_1.fastq.gz -O 10677051_2.fastq.gz -I SRR10677051_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677089_1.fastq.gz -o 10677089_1.fastq.gz -O 10677089_2.fastq.gz -I SRR10677089_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 & 
+fastp -i SRR10677162_1.fastq.gz -o 10677162_1.fastq.gz -O 10677162_2.fastq.gz -I SRR10677162_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+
+fastp -i SRR10676825_1.fastq.gz -o 10676825_1.fastq.gz -O 10676825_2.fastq.gz -I SRR10676825_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677009_1.fastq.gz -o 10677009_1.fastq.gz -O 10677009_2.fastq.gz -I SRR10677009_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676923_1.fastq.gz -o 10676923_1.fastq.gz -O 10676923_2.fastq.gz -I SRR10676923_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10676939_1.fastq.gz -o 10676939_1.fastq.gz -O 10676939_2.fastq.gz -I SRR10676939_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677088_1.fastq.gz -o 10677088_1.fastq.gz -O 10677088_2.fastq.gz -I SRR10677088_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677182_1.fastq.gz -o 10677182_1.fastq.gz -O 10677182_2.fastq.gz -I SRR10677182_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+fastp -i SRR10677181_1.fastq.gz -o 10677181_1.fastq.gz -O 10677181_2.fastq.gz -I SRR10677181_2.fastq.gz --dedup --detect_adapter_for_pe -x --correction --trim_front1=10 &
+
+
+#Verificamos la calidad del Trimming (We verify the quality of Trimming)
+
+mkdir trimmedFastQC
+fastqc -t 20 trimmed/*.fastq.gz -o trimmedFastQC
+
+#Alineacion (Alignment)
+
+#Descargamos el archivo del transcriptoma humano (We download the human transcriptome file)
+
+wget ftp://ftp.ensembl.org/pub/release-84/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+gzip -d Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+mv Homo_sapiens.GRCh38.dna.primary_assembly.fa genome.fa
+#Crear el indice del genoma del humano
+hisat2-build -p 16 genome.fa genome
+
+
+#Empezamos el alineamiento..(We begin the alignment.)
+
+nano doHisat2.sh
+
+mkdir mapping
+
+for fn in trimmed/*_1.fastq.gz;
+do
+base=${fn##*/};
+echo "Processing sample ${base%_*}"
+hisat2 -p 2 --dta -x databases/genome -1 $fn -2 ${fn%_*}_2.fastq.gz -S mapping/${base%_*}_genome.sam 2> mapping/${base%_*}.align.stat.txt
+samtools sort -@ 4 -o mapping/${base%_*}_genome.bam mapping/${base%_*}_genome.sam
+rm mapping/${base%_*}_genome.sam
+done
+#Corremos el script (We run the script)
+bash doHisat2.sh
+
+
+##Comenzamos la cuantificacion (We begin the quantification)
+#Primero, entramos a Rstudio y especificamos el directorio de trabajo donde sea que tengamos almacenados los archivos bam del alineamiento con Hisat2 (First, we go into Rstudio and specify the working directory where we have the Hisat2 alignment bam files stored.)
+
+BiocManager::install("Rsubread")
+library(Rsubread)
+#Luego, es necesario ejecutar la función de recuento de características de esta biblioteca para todos los archivos BAM. Primero, debemos seleccionarlos archivos BAM:(Then you need to run the feature count function of this library for all BAM files. First, we must select the BAM files)
+
+bam.list <- dir(pattern=".bam")
+#Dado que existen diferentes tipos de preparación de bibliotecas y configuraciones de ejecución, el usuario debe utilizar el apropiado. En este caso, usamos la opción non-stranded (strandSpecific = 0). (Since there are different types of library preparation and execution configurations, the user must use the appropriate one. In this case, we use the non-stranded option (strandSpecific = 0))
+#El siguiente comando ejecuta el programa usando 6 hilos y almacena la salida en objeto "fc0".(The following command runs the program using 6 threads and stores the output in object "fc0".)
+fc0 <- featureCounts(bam.list, annot.ext= "C:/Users/MGuerra/Documents/tesis/familia_sox/databases",isGTFAnnotationFile=T, allowMultiOverlap=T, isPairedEnd=T, nthreads=8, strandSpecific=0)
+# Luego, guardamos los recuentos y las estadísticas asociadas en archivos delimitados por tabulaciones:(We then save the counts and associated statistics in tab-delimited files:)
+>write.table(fc0$counts, "../fc0.counts.txt", sep="\t", col.names=NA, quote=F)
+>write.table(fc0$stat, "../fc0.stat.txt", sep="\t", row.names=F, quote=F)
+# Ahora, con el archivo fc0.counts.txt, procederemos a iniciar el proceso de análisis de RNAseq en R.(Now, with the fc0.counts.txt file, we will proceed to start the RNAseq analysis process in R.)
+
+##Rsubread: cuantificacion en WSL (Rsubread: quantization in WSL)
+#Descargamos el archivo GTF del Humano (We download the GTF file of the Human)
+wget http://ftp.ensembl.org/pub/release-104/gtf/homo_sapiens/Homo_sapiens.GRCh38.104.gtf.gz
+gzip -Homo_sapiens.GRCh38.104.gtf.gz
+#Instalar R en el ambiente conda (Install R in conda environment)
+conda deactivate
+conda create -n env2 -c conda-forge -c bioconda r-base
+conda activate env2
+#Entrar al ambiente R (Enter the R environment) 
+R
+#Instalar los paquetes requeridos (Install required packages) 
+install.packages("BiocManager")
+BiocManager::install("Rsubread")
+#Seguir los pasos de la cuentificacion anterior (Follow the steps of the previous counting)
+library(Rsubread)
+setwd("~/mnt/c/Users/MGuerra/Documents/tesis/familia_sox/databases") # donde estan almacenados los archivos bam (where are the bam files stored)
+bam.list <- dir(pattern=".bam")
+head(bam.list) # una lista de los nombres de los archivos (a list of file names)
+str(bam.list) # el numero de archivos esperados, en este caso deberian ser 28 (the number of files expected, in this case it should be 28)
+
+fc0 <- featureCounts(bam.list, annot.ext= "../databases/Homo_sapiens.GRCh38.104.gtf.gz",isGTFAnnotationFile=T, allowMultiOverlap=T, isPairedEnd=T, nthreads=8, strandSpecific=0
+write.table(fc0$counts, "../fc0.counts.txt", sep="\t", col.names=NA, quote=F)
+write.table(fc0$stat, "../fc0.stat.txt", sep="\t", row.names=F, quote=F)
+# Ahora, podemos copiar el fc0.counts.txt a nuestro sistema de archivos de Windows y usarlo con Windows (Now, we can copy the fc0.counts.txt to our Windows file system and use it with Windows)
+#RStudio para seguir el proceso de análisis de RNAseq en R.(RStudio to follow the RNAseq analysis process in R.)
+cp -r fc0.counts.txt /mnt/c
+
+
+
